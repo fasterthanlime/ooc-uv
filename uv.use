@@ -1,0 +1,5 @@
+Name: libuv
+Description: Ryan's amazementful asynchronous library for all things TCP, UDP, DNS, fs, timers, thread pools, etc.
+SourcePath: source
+IncludePaths: ./uv/include
+Includes: uv.h
