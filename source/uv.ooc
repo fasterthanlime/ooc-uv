@@ -38,7 +38,6 @@ DNS: class {
     // private
 
     _lookup_cb: static func (handle: GetAddrInfo, status: Int, result: AddrInfo) {
-        "Done lookup with status %d, yay!" printfln(status)
         callback := handle data as WrappedFunc
         f: Func(Int, AddrInfo) = callback closure@
         f(status, result)
