@@ -14,6 +14,8 @@ Loop: cover from uv_loop_t* {
      */
    run: extern(uv_run) func -> Int
 
+   // all features are wrapped in classes:
+
    dns: func -> DNS { DNS new(this) }
     
 }
@@ -29,7 +31,7 @@ DNS: class {
      */
     lookup: func (node: String, callback: Func(Int, AddrInfo)) -> Int {
         handle := gc_malloc(GetAddrInfo size) as GetAddrInfo* 
-        uv_getaddrinfo(loop, handle, _lookup_cb, node, null, null)
+        uv_getaddrinfo(loop, handle, _lookup_cb, node toCString(), null, null)
     }
 
     // private
@@ -46,4 +48,7 @@ AddrInfo: cover from struct addrinfo {}
 
 GetAddrInfo: cover from uv_getaddrinfo_t {}
 
+// these shouldn't be needed with rock's header parser, but meh.
+
+uv_getaddrinfo: extern func (...) -> Int
 
