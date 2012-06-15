@@ -8,7 +8,7 @@ main: func {
     dns lookup("joyent.com", |status, result|
         "Resolved address to %s" printfln(result address _)
         tcp := loop tcp()
-        req := tcp connect(result address, |status, stream|
+        tcp connect(result address, |status, stream|
             "Connected, got stream %p" printfln(stream)
         )
     )
