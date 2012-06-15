@@ -31,15 +31,33 @@ DNS: class {
      */
     lookup: func (node: String, callback: Func(Int, AddrInfo)) -> Int {
         handle := gc_malloc(GetAddrInfo_t size) as GetAddrInfo 
+        handle data = wrap(callback as Func)
         uv_getaddrinfo(loop, handle, _lookup_cb, node toCString(), null, null)
     }
 
     // private
 
-    _lookup_cb: static func (handle: GetAddrInfo, status: Int, res: AddrInfo) {
+    _lookup_cb: static func (handle: GetAddrInfo, status: Int, result: AddrInfo) {
         "Done lookup with status %d, yay!" printfln(status)
+        callback := handle data as WrappedFunc
+        f: Func(Int, AddrInfo) = callback closure@
+        f(status, result)
     }
 
+}
+
+WrappedFunc: class {
+    closure: Closure*
+
+    init: func (c: Closure) {
+        closure = gc_malloc(Closure size)
+        closure@ thunk = c thunk
+        closure@ context = c context
+    }
+}
+
+wrap: func (f: Func) -> WrappedFunc {
+    WrappedFunc new(f as Closure)
 }
 
 AddrInfo: cover from AddrInfo_t* {
@@ -63,8 +81,16 @@ SockAddrIn_t: cover from struct sockaddr_in
 
 // private
 
-GetAddrInfo: cover from GetAddrInfo_t*
-GetAddrInfo_t: cover from uv_getaddrinfo_t
+GetAddrInfo: cover from GetAddrInfo_t* {
+    data: Pointer {
+        set (x) { this@ data = x }
+        get { this@ data }
+    }
+}
+
+GetAddrInfo_t: cover from uv_getaddrinfo_t {
+    data: Pointer
+}
 
 // these shouldn't be needed with rock's header parser, but meh.
 
