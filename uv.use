@@ -3,3 +3,5 @@ Description: Ryan's amazementful asynchronous library for all things TCP, UDP, D
 SourcePath: source
 IncludePaths: ./uv/include
 Includes: uv.h
+Libs: -lrt, -lm
+Objects: ./uv/uv.a
