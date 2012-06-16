@@ -1,5 +1,5 @@
 use uv
-include uv
+include uv, arpa/inet
 
 /* general data structures */
 
@@ -15,7 +15,29 @@ Handle_s: cover from uv_handle_t {
     data: extern Pointer
 }
 
-Stream: cover from Stream_s*
+Stream: cover from Stream_s* {
+
+    /*
+     * Queue an ooc string to be written
+     */
+    write: func ~str (str: String) -> Int {
+        write(str toCString(), str size)
+    }
+
+    /**
+     * Queue a buffer to be written
+     */
+    write: func (data: Pointer, length: SizeT) -> Int {
+        buf := (data, length) as Buf_t
+        req := gc_malloc(Write_s size) as Write
+        uv_write(req, this, buf&, 1, _dummy_callback)
+    }
+
+    // private stuff
+    _dummy_callback: static func
+
+}
+
 Stream_s: cover from uv_stream_t extends Handle_s {
 
 }
@@ -25,10 +47,20 @@ Req_s: cover from uv_req_t {
     data: extern Pointer
 }
 
+Write: cover from Write_s*
+Write_s: cover from uv_write_t extends Req_s { }
+
 Connect: cover from Connect_s* 
 Connect_s: cover from uv_connect_t extends Req_s {
     data: Pointer // FIXME: this should work from handle
     handle: extern Stream
+}
+
+Buf: cover from Buf_t*
+
+Buf_t: cover from uv_buf_t {
+    base: Pointer
+    len: SizeT
 }
 
 
@@ -89,11 +121,11 @@ TCP: cover from TCP_s* {
         tcp
     }
 
-    connect: func (sockaddr: SockAddr, callback: Func(Int, Stream)) -> Int {
+    connect: func (sockaddr: SockAddrIn, callback: Func(Int, Stream)) -> Int {
         // TODO: make new request, call uv_tcp_connect
         connect := gc_malloc(Connect_s size) as Connect
         connect@ data = wrap(callback as Func)
-        uv_tcp_connect(connect, this, (sockaddr as SockAddrIn_s*)@, _connect_cb)
+        uv_tcp_connect(connect, this, sockaddr@, _connect_cb)
     }
 
     // private
@@ -135,15 +167,32 @@ AddrInfo_s: cover from struct addrinfo {
 }
 
 SockAddr: cover from SockAddr_s* {
+    in: SockAddrIn { get {
+        // TODO: check and throw exception
+        this as SockAddrIn
+    } }
+}
+
+SockAddr_s: cover from struct sockaddr
+
+SockAddrIn: cover from SockAddrIn_s* {
+    withPort: func (port: UShort) -> This {
+        copy := gc_malloc(SockAddrIn_s size) as This
+        memcpy(copy, this, SockAddrIn_s size)
+        copy@ port = htons(port)
+        copy
+    }
+
     _: String { get {
-        name := gc_malloc(40) as CString
+        name := gc_malloc(100) as CString
         uv_ip4_name(this as SockAddrIn_s*, name, 1024)
         String new(name)
     } }
 }
 
-SockAddr_s: cover from struct sockaddr
-SockAddrIn_s: cover from struct sockaddr_in
+SockAddrIn_s: cover from struct sockaddr_in {
+    port: extern(sin_port) UShort
+}
 
 // private
 
@@ -155,6 +204,12 @@ GetAddrInfo_s: cover from uv_getaddrinfo_t {
 }
 
 // these shouldn't be needed with rock's header parser, but meh.
+
+// arpa
+htons: extern func (UShort) -> UShort
+
+// stream
+uv_write: extern func (...) -> Int
 
 // dns
 uv_getaddrinfo: extern func (...) -> Int
