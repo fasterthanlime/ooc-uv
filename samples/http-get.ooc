@@ -11,7 +11,6 @@ main: func {
     dns lookup(host, |status, result|
         log("DNS lookup (status %d): %s resolves to %s", status, host, result address in _)
         tcp := loop tcp()
-        port // FIXME: rock workaround
 
         target := result address in withPort(port)
         tcp connect(target, |status, stream|
