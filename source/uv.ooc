@@ -27,19 +27,43 @@ Stream: cover from Stream_s* {
     /**
      * Queue a buffer to be written
      */
-    write: func (data: Pointer, length: SizeT) -> Int {
+    write: func (data: Char*, length: SizeT) -> Int {
         buf := (data, length) as Buf_t
         req := gc_malloc(Write_s size) as Write
-        uv_write(req, this, buf&, 1, _dummy_callback)
+        uv_write(req, this, buf&, 1, null)
+    }
+
+    /**
+     * Read data from an incoming stream. The callback will be made several
+     * several times until there is no more data to read or uv_read_stop is
+     * called. When we've reached EOF nread will be set to -1 and the error is
+     * set to UV_EOF. When nread == -1 the buf parameter might not point to a
+     * valid buffer; in that case buf.len and buf.base are both set to 0.
+     * Note that nread might also be 0, which does *not* indicate an error or
+     * eof; it happens when libuv requested a buffer through the alloc callback
+     * but then decided that it didn't need that buffer.
+     */
+    readStart: func (readCallback: Func (SSizeT, Buf_t)) -> Int {
+        this@ data = wrap(readCallback as Func) // TODO: better idea?
+        uv_read_start(this, _alloc_cb, _read_cb)
     }
 
     // private stuff
-    _dummy_callback: static func
+
+    _alloc_cb: static func (handle: Handle, suggestedSize: SizeT) -> Buf_t {
+        (gc_malloc(suggestedSize), suggestedSize) as Buf_t
+    }
+
+    _read_cb: static func (handle: Stream, nread: SSizeT, buf: Buf_t) {
+        callback := handle@ data as WrappedFunc
+        f: Func(SSizeT, Buf_t) = callback closure@
+        f(nread, buf)
+    }
 
 }
 
 Stream_s: cover from uv_stream_t extends Handle_s {
-
+    data: extern Pointer // shouldn't be needed
 }
 
 Req: cover from Req_s*
@@ -59,8 +83,12 @@ Connect_s: cover from uv_connect_t extends Req_s {
 Buf: cover from Buf_t*
 
 Buf_t: cover from uv_buf_t {
-    base: Pointer
-    len: SizeT
+    base: extern Char*
+    len: extern SizeT
+
+    _: String { get {
+        String new(base, len)
+    } }
 }
 
 
@@ -210,6 +238,7 @@ htons: extern func (UShort) -> UShort
 
 // stream
 uv_write: extern func (...) -> Int
+uv_read_start: extern func (...) -> Int
 
 // dns
 uv_getaddrinfo: extern func (...) -> Int
