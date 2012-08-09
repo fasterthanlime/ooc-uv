@@ -74,6 +74,9 @@ Req_s: cover from uv_req_t {
 Write: cover from Write_s*
 Write_s: cover from uv_write_t extends Req_s { }
 
+UDPSend: cover from UDPSend_s*
+UDPSend_s: cover from uv_udp_send_t extends Req_s { }
+
 Connect: cover from Connect_s* 
 Connect_s: cover from uv_connect_t extends Req_s {
     data: Pointer // FIXME: this should work from handle
@@ -109,12 +112,30 @@ Loop: cover from Loop_s* {
 
    // all features are wrapped in classes:
 
+   ip:  func -> IP { IP new(this) }
    dns: func -> DNS { DNS new(this) }
    tcp: func -> TCP { TCP new(this) }
+   udp: func -> UDP { UDP new(this) }
     
 }
 
 Loop_s: cover from uv_loop_t {
+}
+
+
+IP: class {
+
+    loop: Loop
+    init: func (=loop)
+
+    v4: func (ip: String, port: Int) -> SockAddrIn_s {
+	uv_ip4_addr(ip, port)
+    }
+
+    v6: func (ip: String, port: Int) -> SockAddrIn6_s {
+	uv_ip6_addr(ip, port)
+    }
+
 }
 
 DNS: class {
@@ -170,6 +191,30 @@ TCP_s: cover from uv_tcp_t extends Handle_s {
     
 }
 
+UDP: cover from UDP_s* {
+
+    new: static func (loop: Loop) -> This {
+	udp := gc_malloc(UDP_s size) as UDP_s*
+	uv_udp_init(loop, udp)
+	udp
+    }
+
+    send: func ~string (data: String, addr: SockAddrIn_s) -> Int {
+	send(data toCString(), data size, addr)
+    }
+
+    send: func (data: Char*, length: SizeT, addr: SockAddrIn_s) -> Int {
+	buf := (data, length) as Buf_t
+	req := gc_malloc(UDPSend_s size) as UDPSend
+	uv_udp_send(req, this, buf&, 1, addr, null)
+    }
+
+}
+
+UDP_s: cover from uv_udp_t extends Handle_s {
+
+}
+
 // utils
 
 WrappedFunc: class {
@@ -222,6 +267,9 @@ SockAddrIn_s: cover from struct sockaddr_in {
     port: extern(sin_port) UShort
 }
 
+SockAddrIn6_s: cover from struct sockaddr_in6 {
+}
+
 // private
 
 GetAddrInfo: cover from GetAddrInfo_s* extends Handle {
@@ -247,5 +295,12 @@ uv_getaddrinfo: extern func (...) -> Int
 uv_tcp_init: extern func (...) -> Int
 uv_tcp_connect: extern func (...) -> Int
 
+// udp
+uv_udp_init: extern func (...) -> Int
+uv_udp_send: extern func (...) -> Int
+
+// ip
 uv_ip4_name: extern func (...) -> Int
+uv_ip4_addr: extern func (ip: CString, ...) -> SockAddrIn_s
+uv_ip6_addr: extern func (ip: CString, ...) -> SockAddrIn6_s
 
