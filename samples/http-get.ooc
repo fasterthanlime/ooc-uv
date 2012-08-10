@@ -13,7 +13,7 @@ main: func {
         tcp := loop tcp()
 
         target := result address in withPort(port)
-        tcp connect(target, |status, stream|
+        tcp connect(target@, |status, stream|
             log("Connected to %s:%d (status %d)", target _, port, status)
             stream write("GET / HTTP/1.1\n")
             stream write("Host: %s:%d\n" format(host, port))

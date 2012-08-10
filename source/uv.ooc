@@ -170,11 +170,19 @@ TCP: cover from TCP_s* {
         tcp
     }
 
-    connect: func (sockaddr: SockAddrIn, callback: Func(Int, Stream)) -> Int {
-        // TODO: make new request, call uv_tcp_connect
+    connect: func (sockaddr: SockAddrIn_s, callback: Func(Int, Stream)) -> Int {
         connect := gc_malloc(Connect_s size) as Connect
         connect@ data = wrap(callback as Func)
-        uv_tcp_connect(connect, this, sockaddr@, _connect_cb)
+        uv_tcp_connect(connect, this, sockaddr, _connect_cb)
+    }
+
+    bind: func (sockaddr: SockAddrIn_s) -> Int {
+	uv_tcp_bind(this, sockaddr)
+    }
+
+    listen: func (maxconns: Int, callback: Func (Int, Stream, Stream)) -> Int {
+	this@ data = wrap(callback as Func)
+	uv_listen(this, maxconns, _listen_cb)
     }
 
     // private
@@ -183,6 +191,17 @@ TCP: cover from TCP_s* {
         callback := handle@ data as WrappedFunc
         f: Func(Int, Stream) = callback closure@
         f(status, handle@ handle)
+    }
+
+    _listen_cb: static func (server: TCP, status: Int) {
+	callback := server@ data
+	f: Func(Int, Stream) = callback closure@
+
+	client := server loop tcp()
+	client@ data = server
+
+	status = uv_accept(server, client)
+	f(status, server, client)
     }
 
 }
@@ -294,6 +313,9 @@ uv_getaddrinfo: extern func (...) -> Int
 // tcp
 uv_tcp_init: extern func (...) -> Int
 uv_tcp_connect: extern func (...) -> Int
+uv_tcp_bind: extern func (...) -> Int
+
+SOMAXCONN: extern Int
 
 // udp
 uv_udp_init: extern func (...) -> Int
